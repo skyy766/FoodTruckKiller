@@ -88,10 +88,12 @@ namespace FoodTruckKiller.Player
             {
                 State = PlayerState.Idle;
             }
+        }
 
-            // 驱动位移
-            if (motor != null)
-                motor.Tick(MoveInput);
+        private void FixedUpdate()
+        {
+            // 物理更新：调用 motor.Tick (MovePosition 需在 FixedUpdate)
+            if (motor != null) motor.Tick(MoveInput);
         }
 
         private Vector2 ReadMoveInput()

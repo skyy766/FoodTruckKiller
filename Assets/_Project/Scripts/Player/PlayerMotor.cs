@@ -21,10 +21,20 @@ namespace FoodTruckKiller.Player
             rb.gravityScale = 0f;
         }
 
-        /// <summary>每帧根据输入设置刚体速度。</summary>
+        /// <summary>每帧根据输入设置刚体位置。
+        /// 使用 MovePosition (而非 velocity) 避免和物理引擎状态不一致,
+        /// 也避免和其他 dynamic 物体 (尸体/顾客) 相互推挤造成抖动。</summary>
         public void Tick(Vector2 moveInput)
         {
-            rb.velocity = moveInput * moveSpeed;
+            if (rb == null) return;
+            // 静止时直接 zero 速度
+            if (moveInput.sqrMagnitude < 0.001f)
+            {
+                if (rb.velocity != Vector2.zero) rb.velocity = Vector2.zero;
+                return;
+            }
+            Vector2 next = rb.position + moveInput * moveSpeed * Time.fixedDeltaTime;
+            rb.MovePosition(next);
         }
 
         /// <summary>立即停止移动。</summary>

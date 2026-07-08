@@ -62,6 +62,10 @@ namespace FoodTruckKiller.Assassination
                 go = new GameObject("Corpse_Runtime");
                 go.transform.position = pos;
                 go.AddComponent<BoxCollider2D>();
+                // M2.5: 加 kinematic Rigidbody2D, 物理引擎知道这是静态物体不会推玩家
+                var crb = go.AddComponent<Rigidbody2D>();
+                crb.bodyType = RigidbodyType2D.Kinematic;
+                crb.gravityScale = 0f;
 
                 // 视觉：尝试加载 corpse.png，失败回退到暗红色块
                 var sr = go.AddComponent<SpriteRenderer>();
