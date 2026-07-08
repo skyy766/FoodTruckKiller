@@ -72,7 +72,8 @@ namespace FoodTruckKiller.Corpse
         }
 
         /// <summary>
-        /// 拾起尸体。
+        /// 拾起尸体：放到玩家脚下后方 (localPosition = (0, -0.3, -0.1))
+        /// 这样尸体可见但不与玩家 sprite 重叠 (之前 localPosition=zero 会被玩家盖住看起来"歪")。
         /// </summary>
         public void PickUp(Transform carrier)
         {
@@ -80,13 +81,16 @@ namespace FoodTruckKiller.Corpse
             Carrier = carrier;
             IsCarried = true;
             transform.SetParent(carrier);
-            transform.localPosition = Vector3.zero;
+            transform.localPosition = new Vector3(0f, -0.3f, -0.1f);
+            // 临时关闭尸体上的 Collider2D, 避免和玩家 CircleCollider 重叠卡住物理
+            var col = GetComponent<Collider2D>();
+            if (col != null) col.enabled = false;
             // 搬运时不可被视野检测发现（折叠到玩家身上）。
             if (_detectionTag != null) _detectionTag.SetVisible(false);
         }
 
         /// <summary>
-        /// 放下尸体。
+        /// 放下尸体：恢复 Collider 并脱离玩家。
         /// </summary>
         public void Drop()
         {
@@ -94,6 +98,9 @@ namespace FoodTruckKiller.Corpse
             transform.SetParent(null);
             IsCarried = false;
             Carrier = null;
+            // 恢复 Collider
+            var col = GetComponent<Collider2D>();
+            if (col != null) col.enabled = true;
             if (_detectionTag != null) _detectionTag.SetVisible(true);
         }
 
