@@ -6,6 +6,7 @@ namespace FoodTruckKiller.Customer
 {
     /// <summary>
     /// 顾客 AI：持有状态机与画像，驱动排队、点单、等待、进食、离开、逃跑、死亡等行为。
+    /// <para>视觉由 <see cref="CustomerVisualController"/> 子组件负责（按 variant + 移动速度切 walk 帧）。</para>
     /// </summary>
     [RequireComponent(typeof(Rigidbody2D))]
     public class CustomerAI : MonoBehaviour
@@ -39,6 +40,9 @@ namespace FoodTruckKiller.Customer
 
         /// <summary>刚体引用。</summary>
         private Rigidbody2D _rb;
+
+        /// <summary>当前速度（供视觉组件判定是否在走）。</summary>
+        public Vector2 CurrentVelocity { get; private set; }
 
         private void Awake()
         {
@@ -101,6 +105,7 @@ namespace FoodTruckKiller.Customer
             Vector2 dir = (target - transform.position).normalized;
             Vector2 next = _rb.position + dir * MoveSpeed * Time.deltaTime;
             _rb.MovePosition(next);
+            CurrentVelocity = dir * MoveSpeed;
         }
 
         /// <summary>

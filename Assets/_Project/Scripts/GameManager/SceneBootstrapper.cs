@@ -31,6 +31,7 @@ namespace FoodTruckKiller.GameManager
     /// <item>AudioFeedbackBinder + HitStop</item>
     /// <item>主摄像机 + ScreenShake</item>
     /// <item>Player（含 KillExecutor + CarryController）</item>
+    /// <item>tilemap 铺地（按 scene_layout.json）</item>
     /// </list>
     /// <para>Start 阶段调用 <see cref="GameManager.StartGame"/> 进入 Playing 状态。</para>
     /// </summary>
@@ -79,9 +80,9 @@ namespace FoodTruckKiller.GameManager
 
             var baitGo = new GameObject("[BaitSystem]");
             var bait = baitGo.AddComponent<BaitSystem>();
-            // 诱饵投放点 = 暗巷死角（scene_layout.json DarkAlley 区域中心）
+            // 诱饵投放点 = 暗巷死角（场景中点附近）
             bait.baitDropPoint = new GameObject("BaitDropPoint").transform;
-            bait.baitDropPoint.position = new Vector3(0.203125f, 0.984375f, 0f); // DarkAlley 中心
+            bait.baitDropPoint.position = new Vector3(0.2f, 0.8f, 0f);
 
             // === 8. AlertSystem / EvidenceTracker / WantedSystem（M2 警戒系统） ===
             var alertGo = new GameObject("[AlertSystem]");
@@ -107,46 +108,51 @@ namespace FoodTruckKiller.GameManager
             var cookCtl = cookGo.AddComponent<CookingController>();
             gameMgr.AssignCookingController(cookCtl);
 
-            CreateCookingStation(CookingWorkstation.Chop, "ChopStation", new Vector3(-2f, -1f, 0f));
-            CreateCookingStation(CookingWorkstation.Grill, "GrillStation", new Vector3(0f, -1f, 0f));
-            CreateCookingStation(CookingWorkstation.Assemble, "AssembleStation", new Vector3(2f, -1f, 0f));
-            CreateCookingStation(CookingWorkstation.Serve, "ServeStation", new Vector3(0f, 1f, 0f));
+            CreateCookingStation(CookingWorkstation.Chop, "ChopStation", new Vector3(-1.2f, 0.2f, 0f));
+            CreateCookingStation(CookingWorkstation.Grill, "GrillStation", new Vector3(0.0f, 0.2f, 0f));
+            CreateCookingStation(CookingWorkstation.Assemble, "AssembleStation", new Vector3(1.2f, 0.2f, 0f));
+            CreateCookingStation(CookingWorkstation.Serve, "ServeStation", new Vector3(0f, 0.9f, 0f));
 
             // === 10. 环境击杀对象 ===
             CreateEnvironmentKill("GasCanister",
-                new Vector3(1.65625f, 0.28125f, 0f),  // scene_layout.json gasCanister
+                new Vector3(1.6f, -0.3f, 0f),
                 "gas_tank", 2f, "引爆煤气罐");
 
             CreateEnvironmentKill("Billboard",
-                new Vector3(1.75f, 0.375f, 0f),  // scene_layout.json billboard
+                new Vector3(1.4f, 0.9f, 0f),
                 "billboard", 1.5f, "推倒广告牌");
 
             // === 11. 处理站 ===
             CreateDisposalStation("Grinder", DisposalMethod.Grind,
-                new Vector3(0.1875f, 1.0f, 0f), "绞肉机");      // scene_layout grinder
+                new Vector3(-1.0f, -0.7f, 0f), "绞肉机");
             CreateDisposalStation("Freezer", DisposalMethod.Freeze,
-                new Vector3(1.03125f, 0.40625f, 0f), "冰柜");    // scene_layout freezer
+                new Vector3(0.5f, -0.8f, 0f), "冰柜");
             CreateDisposalStation("Dump", DisposalMethod.Dump,
-                new Vector3(0.1875f, 1.09375f, 0f), "垃圾桶");   // scene_layout dump
+                new Vector3(1.1f, -0.7f, 0f), "垃圾桶");
 
             // === 12. AudioFeedbackBinder + HitStop ===
             var binderGo = new GameObject("[AudioFeedbackBinder]");
             binderGo.AddComponent<AudioFeedbackBinder>();
             binderGo.AddComponent<HitStop>();
 
-            // === 13. 主摄像机 + ScreenShake ===
+            // === 13. 主摄像机 + ScreenShake（统一由本类管理，SceneSetupWizard 不再配置） ===
             var camGo = new GameObject("[MainCamera]");
             var cam = camGo.AddComponent<Camera>();
             cam.tag = "MainCamera";
             cam.transform.position = new Vector3(0f, 0f, -10f);
             cam.orthographic = true;
-            cam.orthographicSize = 6f;
-            cam.backgroundColor = new Color(0.18f, 0.12f, 0.22f);
+            cam.orthographicSize = 4.5f;            // 视野高度 9 单位，适配 5x3 场景
+            cam.backgroundColor = new Color(0.12f, 0.08f, 0.16f); // 暗紫夜色
             cam.clearFlags = CameraClearFlags.SolidColor;
             camGo.AddComponent<ScreenShake>();
 
             // === 14. Player（含 KillExecutor + CarryController） ===
             CreatePlayer(new Vector3(0f, 0f, 0f));
+
+            // === 15. tilemap 铺地（M2 视觉增强） ===
+            var bgGo = new GameObject("[Background]");
+            var builder = bgGo.AddComponent<TilemapBuilder>();
+            builder.Build();
         }
 
         private void Start()
@@ -167,16 +173,27 @@ namespace FoodTruckKiller.GameManager
             var station = go.AddComponent<CookingStation>();
             station.workstation = ws;
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = MakeSolidSprite();
-            sr.color = ws switch
+
+            // 加载美术：4 个工作位用 cooking_station.png（共用底座）
+            var sprite = LoadSprite("Sprites/Props/cooking_station");
+            if (sprite != null)
             {
-                CookingWorkstation.Chop => new Color(0.4f, 0.3f, 0.2f),
-                CookingWorkstation.Grill => new Color(1.0f, 0.4f, 0.1f),
-                CookingWorkstation.Assemble => new Color(0.6f, 0.6f, 0.7f),
-                CookingWorkstation.Serve => new Color(0.2f, 0.8f, 0.3f),
-                _ => Color.white
-            };
-            sr.transform.localScale = new Vector3(1.2f, 1.2f, 1f);
+                sr.sprite = sprite;
+                sr.color = Color.white;
+            }
+            else
+            {
+                sr.sprite = MakeSolidSprite();
+                sr.color = ws switch
+                {
+                    CookingWorkstation.Chop => new Color(0.4f, 0.3f, 0.2f),
+                    CookingWorkstation.Grill => new Color(1.0f, 0.4f, 0.1f),
+                    CookingWorkstation.Assemble => new Color(0.6f, 0.6f, 0.7f),
+                    CookingWorkstation.Serve => new Color(0.2f, 0.8f, 0.3f),
+                    _ => Color.white
+                };
+            }
+            sr.transform.localScale = new Vector3(1.0f, 1.0f, 1f);
             sr.sortingOrder = 5;
             return station;
         }
@@ -203,13 +220,28 @@ namespace FoodTruckKiller.GameManager
 
             // 视觉
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = MakeSolidSprite();
-            sr.color = killMethodId switch
+            string spriteName = killMethodId switch
             {
-                "gas_tank" => new Color(1f, 0.3f, 0f),     // 橙色煤气罐
-                "billboard" => new Color(0.5f, 0.5f, 0.6f), // 灰色广告牌
-                _ => Color.gray
+                "gas_tank"  => "Sprites/Props/gas_canister",
+                "billboard" => "Sprites/Props/billboard",
+                _ => null
             };
+            var sprite = spriteName != null ? LoadSprite(spriteName) : null;
+            if (sprite != null)
+            {
+                sr.sprite = sprite;
+                sr.color = Color.white;
+            }
+            else
+            {
+                sr.sprite = MakeSolidSprite();
+                sr.color = killMethodId switch
+                {
+                    "gas_tank" => new Color(1f, 0.3f, 0f),
+                    "billboard" => new Color(0.5f, 0.5f, 0.6f),
+                    _ => Color.gray
+                };
+            }
             sr.transform.localScale = new Vector3(1f, 1f, 1f);
             sr.sortingOrder = 3;
 
@@ -234,15 +266,31 @@ namespace FoodTruckKiller.GameManager
 
             // 视觉
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = MakeSolidSprite();
-            sr.color = method switch
+            string spriteName = method switch
             {
-                DisposalMethod.Grind => new Color(0.7f, 0.1f, 0.1f),   // 深红绞肉机
-                DisposalMethod.Freeze => new Color(0.2f, 0.6f, 1f),     // 蓝色冰柜
-                DisposalMethod.Dump => new Color(0.3f, 0.3f, 0.2f),     // 暗棕垃圾桶
-                _ => Color.gray
+                DisposalMethod.Grind  => "Sprites/Props/grinder",
+                DisposalMethod.Freeze => "Sprites/Props/freezer",
+                DisposalMethod.Dump   => "Sprites/Props/trash_bin",
+                _ => null
             };
-            sr.transform.localScale = new Vector3(0.8f, 0.8f, 1f);
+            var sprite = spriteName != null ? LoadSprite(spriteName) : null;
+            if (sprite != null)
+            {
+                sr.sprite = sprite;
+                sr.color = Color.white;
+            }
+            else
+            {
+                sr.sprite = MakeSolidSprite();
+                sr.color = method switch
+                {
+                    DisposalMethod.Grind => new Color(0.7f, 0.1f, 0.1f),
+                    DisposalMethod.Freeze => new Color(0.2f, 0.6f, 1f),
+                    DisposalMethod.Dump => new Color(0.3f, 0.3f, 0.2f),
+                    _ => Color.gray
+                };
+            }
+            sr.transform.localScale = new Vector3(0.9f, 0.9f, 1f);
             sr.sortingOrder = 3;
 
             Debug.Log($"[SceneBootstrapper] Created disposal station: {name} ({label}) at {pos}");
@@ -275,20 +323,38 @@ namespace FoodTruckKiller.GameManager
             interactor.RebindDependencies();
             interactor.ConfigureDetection(~0, 0.6f);
 
-            // 视觉：红色方块（玩家厨师）
+            // 视觉：加载 player_idle 美术
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = MakeSolidSprite();
-            sr.color = new Color(0.9f, 0.2f, 0.2f);
+            var idle = LoadSprite("Sprites/Characters/Player/player_idle");
+            if (idle != null)
+            {
+                sr.sprite = idle;
+                sr.color = Color.white;
+            }
+            else
+            {
+                sr.sprite = MakeSolidSprite();
+                sr.color = new Color(0.9f, 0.2f, 0.2f);
+            }
             sr.sortingOrder = 20;
+
+            // 视觉切换组件
+            go.AddComponent<PlayerVisualController>();
 
             Debug.Log($"[SceneBootstrapper] Created Player at {pos} with KillExecutor + CarryController");
             return go;
         }
 
-        // ---- 工具：创建一个白色 1x1 像素 Sprite（运行时） ----
+        // ---- 工具 ----
+
+        /// <summary>从 Resources 加载 Sprite，失败返回 null。</summary>
+        public static Sprite LoadSprite(string path)
+        {
+            return Resources.Load<Sprite>(path);
+        }
 
         private static Sprite _solidSprite;
-        private static Sprite MakeSolidSprite()
+        public static Sprite MakeSolidSprite()
         {
             if (_solidSprite != null) return _solidSprite;
             var tex = new Texture2D(1, 1, TextureFormat.RGBA32, false);

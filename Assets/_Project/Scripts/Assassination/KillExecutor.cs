@@ -63,15 +63,26 @@ namespace FoodTruckKiller.Assassination
                 go.transform.position = pos;
                 go.AddComponent<BoxCollider2D>();
 
-                // 视觉：暗红色方块表示尸体
+                // 视觉：尝试加载 corpse.png，失败回退到暗红色块
                 var sr = go.AddComponent<SpriteRenderer>();
-                var tex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
-                tex.filterMode = FilterMode.Point;
-                tex.SetPixel(0, 0, new Color(0.6f, 0.1f, 0.1f)); // 暗红血渍色
-                tex.Apply();
-                sr.sprite = Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f), 1f);
+                var corpseSprite = Resources.Load<Sprite>("Sprites/Corpse/corpse");
+                if (corpseSprite != null)
+                {
+                    sr.sprite = corpseSprite;
+                    sr.color = Color.white;
+                    sr.transform.localScale = new Vector3(1.2f, 1.2f, 1f); // 16x16 放大至近 32x32
+                }
+                else
+                {
+                    var tex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+                    tex.filterMode = FilterMode.Point;
+                    tex.SetPixel(0, 0, new Color(0.6f, 0.1f, 0.1f));
+                    tex.Apply();
+                    sr.sprite = Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f), 1f);
+                    sr.color = Color.white;
+                    sr.transform.localScale = new Vector3(0.7f, 0.7f, 1f);
+                }
                 sr.sortingOrder = 1;
-                sr.transform.localScale = new Vector3(0.7f, 0.7f, 1f);
             }
 
             // 添加尸体组件

@@ -117,14 +117,11 @@ namespace FoodTruckKiller.Customer
             go.transform.position = pos;
             var rb = go.AddComponent<Rigidbody2D>();
             rb.gravityScale = 0f;
+            int variant = (SpawnedCount % 3) + 1;
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sortingOrder = 10;
-            var sprite = LoadCustomerSprite(SpawnedCount % 3);
-            if (sprite != null)
-            {
-                sr.sprite = sprite;
-            }
-            else
+            sr.sprite = LoadCustomerSprite(variant - 1);
+            if (sr.sprite == null)
             {
                 // fallback：sprite 加载失败时用运行时生成方块（变体颜色）
                 sr.sprite = MakeFallbackSprite();
@@ -135,7 +132,40 @@ namespace FoodTruckKiller.Customer
                 };
                 sr.color = cols[Mathf.Abs(SpawnedCount) % 3];
             }
+
+            // 视觉控制器（负责 walk 帧切换）
+            var visual = go.AddComponent<CustomerVisualController>();
+            visual.SetVariant(variant);
+
+            // 头顶 OrderBubble 子对象
+            CreateOrderBubble(go.transform);
+
             return go.AddComponent<CustomerAI>();
+        }
+
+        /// <summary>
+        /// 在顾客头顶创建一个简单的 OrderBubble 子物体（带 order_bubble.png 背景）。
+        /// </summary>
+        private static void CreateOrderBubble(Transform parent)
+        {
+            var bubbleGo = new GameObject("OrderBubble");
+            bubbleGo.transform.SetParent(parent, false);
+            bubbleGo.transform.localPosition = new Vector3(0f, 0.9f, 0f);
+
+            var sr = bubbleGo.AddComponent<SpriteRenderer>();
+            sr.sprite = Resources.Load<Sprite>("Sprites/UI/order_bubble");
+            sr.sortingOrder = 12;
+            sr.color = Color.white;
+            if (sr.sprite == null)
+            {
+                // fallback：纯白方块
+                sr.sprite = MakeFallbackSprite();
+                sr.color = new Color(1f, 1f, 1f, 0.85f);
+            }
+
+            var bubble = bubbleGo.AddComponent<OrderBubble>();
+            bubble.bubbleRoot = bubbleGo;
+            bubbleGo.SetActive(false);
         }
 
         private static Sprite _fallbackSprite;

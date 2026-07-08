@@ -20,17 +20,9 @@ namespace FoodTruckKiller.EditorTools
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
             // ---- Main Camera ----
-            var camGo = new GameObject("Main Camera");
-            camGo.tag = "MainCamera";
-            var cam = camGo.AddComponent<Camera>();
-            cam.orthographic = true;
-            cam.orthographicSize = 4.22f; // (270/2)/32
-            cam.transform.position = new Vector3(0.94f, 0.63f, -10f);
-            cam.backgroundColor = new Color(0.1f, 0.08f, 0.18f);
-
-            // 尝试添加 PixelPerfectCamera（URP 2D 自带，用反射兼容不同版本）
-            TryAddComponent(camGo, "UnityEngine.Rendering.Universal.PixelPerfectCamera, Unity.RenderPipelines.Universal.Runtime");
-            Debug.Log("[餐车杀手] Camera 已创建，请在 Inspector 确认 PixelPerfectCamera 的 Assets PPU = 32");
+            // 注意：摄像机由 SceneBootstrapper 统一创建并管理（size 4.5、position (0,0,-10)），
+            // 此处不再创建，避免双相机冲突。
+            Debug.Log("[餐车杀手] Camera 由 SceneBootstrapper 创建，跳过。");
 
             // ---- Directional Light (2D 场景可选) ----
             var lightGo = new GameObject("Directional Light");

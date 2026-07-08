@@ -108,6 +108,47 @@ namespace FoodTruckKiller.Cooking
 
         private string _currentProcessingId;
 
+        /// <summary>烹饪动画帧切换。</summary>
+        private float _animTimer;
+        private bool _animFrame;
+        private Sprite _spriteIdle;
+        private Sprite _spriteCook1;
+        private Sprite _spriteCook2;
+        private SpriteRenderer _sr;
+
+        private void Awake()
+        {
+            _sr = GetComponent<SpriteRenderer>();
+            if (_sr != null)
+            {
+                _spriteIdle  = Resources.Load<Sprite>("Sprites/Props/cooking_station");
+                _spriteCook1 = Resources.Load<Sprite>("Sprites/Props/cooking_station_cooking_01");
+                _spriteCook2 = Resources.Load<Sprite>("Sprites/Props/cooking_station_cooking_02");
+                if (_spriteIdle != null) _sr.sprite = _spriteIdle;
+            }
+        }
+
+        private void Update()
+        {
+            if (_sr == null || _spriteCook1 == null || _spriteCook2 == null) return;
+            if (IsBusy)
+            {
+                _animTimer += Time.deltaTime;
+                if (_animTimer >= 0.25f)
+                {
+                    _animTimer = 0f;
+                    _animFrame = !_animFrame;
+                    _sr.sprite = _animFrame ? _spriteCook1 : _spriteCook2;
+                }
+            }
+            else if (_sr.sprite == _spriteCook1 || _sr.sprite == _spriteCook2)
+            {
+                // 恢复 idle
+                if (_spriteIdle != null) _sr.sprite = _spriteIdle;
+                _animTimer = 0f;
+            }
+        }
+
         /// <summary>完成处理回调。</summary>
         private void FinishProcess()
         {

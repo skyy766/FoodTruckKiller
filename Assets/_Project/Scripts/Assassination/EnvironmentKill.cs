@@ -41,8 +41,15 @@ namespace FoodTruckKiller.Assassination
             if (Triggered && oneShot) return;
             Triggered = true;
 
+            // 优先使用 effectPrefab，否则按击杀方式自建 FX
             if (effectPrefab != null)
+            {
                 Instantiate(effectPrefab, transform.position, Quaternion.identity);
+            }
+            else
+            {
+                SpawnAutoFX();
+            }
 
             // 运行时动态获取玩家身上的 KillExecutor
             KillExecutor executor = killExecutor;
@@ -81,6 +88,30 @@ namespace FoodTruckKiller.Assassination
         {
             Gizmos.color = Color.red;
             Gizmos.DrawWireSphere(transform.position, effectRadius);
+        }
+
+        /// <summary>
+        /// 自建临时 FX：按击杀方式选 explosion/smoke sprite，缩放由小到大，0.5s 后销毁。
+        /// </summary>
+        private void SpawnAutoFX()
+        {
+            bool isExplosion = killMethod != null && killMethod.id == "gas_tank";
+            string spriteName = isExplosion ? "Sprites/FX/explosion" : "Sprites/FX/smoke";
+            var sprite = Resources.Load<Sprite>(spriteName);
+            if (sprite == null) return;
+
+            var fxGo = new GameObject(isExplosion ? "FX_Explosion" : "FX_Smoke");
+            fxGo.transform.position = transform.position;
+            var sr = fxGo.AddComponent<SpriteRenderer>();
+            sr.sprite = sprite;
+            sr.sortingOrder = 30;
+            sr.color = Color.white;
+            fxGo.transform.localScale = new Vector3(0.4f, 0.4f, 1f);
+
+            // 简易缩放动画
+            var fader = fxGo.AddComponent<SimpleFXFader>();
+            fader.duration = 0.6f;
+            fader.endScale = isExplosion ? 2.5f : 1.8f;
         }
     }
 }
