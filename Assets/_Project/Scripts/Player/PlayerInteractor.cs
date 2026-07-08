@@ -132,14 +132,22 @@ namespace FoodTruckKiller.Player
                 return;
             }
 
-            // 通用交互（尸体拾取/放下、烹饪台、环境击杀等）
-            currentTarget.OnInteract(controller);
-
-            // 如果交互结果是拾起了尸体，同步到 CarryController
-            if (currentTarget is CorpseEntity corpse && corpse.IsCarried && carry != null && !carry.IsCarrying)
+            // 拾起尸体：先让 CarryController 接管 (统一走 ICarryable.OnPickedUp)
+            if (currentTarget is CorpseEntity corpseToPick && !corpseToPick.IsCarried && carry != null && !carry.IsCarrying)
             {
-                carry.PickUp(corpse);
+                carry.PickUp(corpseToPick);
+                return;
             }
+
+            // 放下尸体：玩家在拾起状态下按 E 也能对着空气放下
+            if (carry != null && carry.IsCarrying)
+            {
+                carry.Drop();
+                return;
+            }
+
+            // 通用交互（烹饪台 / 环境击杀 / 处理站 / 已拾起尸体的处理站等）
+            currentTarget.OnInteract(controller);
         }
 
         /// <summary>处理攻击（F 键）：在朝向前方锥形区域检测顾客并执行近战击杀。

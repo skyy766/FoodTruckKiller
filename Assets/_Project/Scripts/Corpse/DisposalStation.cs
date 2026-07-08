@@ -17,7 +17,7 @@ namespace FoodTruckKiller.Corpse
         public DisposalMethod method = DisposalMethod.Grind;
 
         /// <summary>处理时长（秒）。</summary>
-        public float processDuration = 3f;
+        public float processDuration = 1.5f;
 
         /// <summary>交互提示。</summary>
         [SerializeField] private string promptName = "处理尸体";
