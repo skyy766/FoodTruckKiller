@@ -123,7 +123,30 @@ namespace FoodTruckKiller.Player
         /// <summary>处理交互（E 键）。</summary>
         private void HandleInteract()
         {
-            if (currentTarget == null || controller == null) return;
+            if (controller == null) return;
+
+            // 没检测到目标时，尝试在玩家身边找尸体（E 键拾取容错）
+            if (currentTarget == null && carry != null && !carry.IsCarrying)
+            {
+                var corpse = FindNearbyCorpse();
+                if (corpse != null)
+                {
+                    Debug.Log($"[PlayerInteractor] E 拾起尸体 (容错搜索) at {corpse.transform.position}");
+                    carry.PickUp(corpse);
+                    return;
+                }
+            }
+
+            if (currentTarget == null)
+            {
+                // 没目标但正在搬运 → 放下
+                if (carry != null && carry.IsCarrying)
+                {
+                    carry.Drop();
+                    return;
+                }
+                return;
+            }
 
             // 如果正在搬运尸体且目标是处理站，走 DisposalStation
             if (carry != null && carry.IsCarrying && currentTarget is DisposalStation disposal)
@@ -132,22 +155,44 @@ namespace FoodTruckKiller.Player
                 return;
             }
 
-            // 拾起尸体：先让 CarryController 接管 (统一走 ICarryable.OnPickedUp)
+            // 拾起尸体：先让 CarryController 接管
             if (currentTarget is CorpseEntity corpseToPick && !corpseToPick.IsCarried && carry != null && !carry.IsCarrying)
             {
+                Debug.Log($"[PlayerInteractor] E 拾起尸体 (检测命中) at {corpseToPick.transform.position}");
                 carry.PickUp(corpseToPick);
                 return;
             }
 
-            // 放下尸体：玩家在拾起状态下按 E 也能对着空气放下
+            // 放下尸体：已搬运状态下按 E
             if (carry != null && carry.IsCarrying)
             {
                 carry.Drop();
                 return;
             }
 
-            // 通用交互（烹饪台 / 环境击杀 / 处理站 / 已拾起尸体的处理站等）
+            // 通用交互（烹饪台 / 环境击杀等）
             currentTarget.OnInteract(controller);
+        }
+
+        /// <summary>在玩家周围 1.0 单位内搜索未被搬运的尸体（拾取容错）。</summary>
+        private CorpseEntity FindNearbyCorpse()
+        {
+            var hits = Physics2D.OverlapCircleAll(transform.position, 1.0f);
+            CorpseEntity nearest = null;
+            float bestSqr = float.MaxValue;
+            foreach (var hit in hits)
+            {
+                var c = hit.GetComponent<CorpseEntity>();
+                if (c == null) c = hit.GetComponentInParent<CorpseEntity>();
+                if (c == null || c.IsCarried || c.IsDisposed) continue;
+                float sqr = (c.transform.position - transform.position).sqrMagnitude;
+                if (sqr < bestSqr)
+                {
+                    bestSqr = sqr;
+                    nearest = c;
+                }
+            }
+            return nearest;
         }
 
         /// <summary>处理攻击（F 键）：在朝向前方锥形区域检测顾客并执行近战击杀。
