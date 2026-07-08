@@ -30,7 +30,7 @@ namespace FoodTruckKiller.Customer
         public Transform exitTransform;
 
         /// <summary>生成间隔（秒）。</summary>
-        public float spawnInterval = 8f;
+        public float spawnInterval = 3f;
 
         /// <summary>单日最大生成数。</summary>
         public int maxDailySpawn = 20;

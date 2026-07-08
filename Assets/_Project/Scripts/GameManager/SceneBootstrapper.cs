@@ -93,11 +93,18 @@ namespace FoodTruckKiller.GameManager
             wantedGo.AddComponent<WantedSystem>();
 
             // === 9. CustomerSpawner / CookingController + CookingStation x4 ===
+            // QueueManager 放在出餐窗口上方（玩家头顶位置），排队方向朝下
             var queueGo = new GameObject("[QueueManager]");
-            queueGo.AddComponent<QueueManager>();
+            var queueMgr = queueGo.AddComponent<QueueManager>();
+            queueGo.transform.position = new Vector3(0f, 1.5f, 0f); // 排队起点（窗口上方）
 
+            // CustomerSpawner 放在屏幕左上角，顾客从左侧入场
             var spawnerGo = new GameObject("[CustomerSpawner]");
+            spawnerGo.transform.position = new Vector3(-3f, 1.5f, 0f); // 顾客生成点（左侧入场）
             var spawner = spawnerGo.AddComponent<CustomerSpawner>();
+            // 设一个离场点（右侧）
+            var exitGo = new GameObject("CustomerExitPoint");
+            exitGo.transform.position = new Vector3(3f, 1.5f, 0f);
             if (JsonDataLoader.CustomerProfiles != null)
                 spawner.profiles = JsonDataLoader.CustomerProfiles;
             if (JsonDataLoader.Recipes != null)
@@ -141,7 +148,7 @@ namespace FoodTruckKiller.GameManager
             cam.tag = "MainCamera";
             cam.transform.position = new Vector3(0f, 0f, -10f);
             cam.orthographic = true;
-            cam.orthographicSize = 4.5f;            // 视野高度 9 单位，适配 5x3 场景
+            cam.orthographicSize = 3.5f;            // 拉近视野，看清细节
             cam.backgroundColor = new Color(0.12f, 0.08f, 0.16f); // 暗紫夜色
             cam.clearFlags = CameraClearFlags.SolidColor;
             camGo.AddComponent<ScreenShake>();

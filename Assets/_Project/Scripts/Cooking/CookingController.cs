@@ -52,6 +52,7 @@ namespace FoodTruckKiller.Cooking
         public void EnterWorkstation(CookingStation station)
         {
             ActiveStation = station;
+            Debug.Log($"[CookingController] 进入工作位: {station.workstation}, 当前订单: {(CurrentOrder != null ? CurrentOrder.Recipe?.name : "无")}");
             switch (station.workstation)
             {
                 case CookingWorkstation.Chop:
@@ -131,6 +132,7 @@ namespace FoodTruckKiller.Cooking
         {
             if (CurrentOrder == null)
             {
+                Debug.Log("[CookingController] 出餐台：无订单，忽略");
                 SetState(CookingState.Idle);
                 return;
             }
@@ -138,9 +140,14 @@ namespace FoodTruckKiller.Cooking
             if (CurrentOrder.State == OrderState.Ready)
             {
                 CurrentOrder.MarkServed();
+                Debug.Log($"[CookingController] ✅ 出餐成功！订单: {CurrentOrder.Recipe?.name}");
                 // 触发出餐音效与全局订单完成事件
                 GameEvents.OnServe?.Raise();
                 GameEvents.OnOrderServed?.Raise();
+            }
+            else
+            {
+                Debug.Log($"[CookingController] 出餐失败：订单状态={CurrentOrder.State}（需要先完成 Chop→Grill→Assemble）");
             }
             SetState(CookingState.Idle);
         }

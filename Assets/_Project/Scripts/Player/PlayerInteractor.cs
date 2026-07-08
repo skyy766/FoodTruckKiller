@@ -135,35 +135,37 @@ namespace FoodTruckKiller.Player
             }
         }
 
-        /// <summary>处理攻击（F 键）：在朝向前方检测目标顾客并执行近战击杀。</summary>
+        /// <summary>处理攻击（F 键）：在朝向前方检测顾客并执行近战击杀。
+        /// M2 测试阶段：允许击杀任何顾客（不限 Target 类型），方便测试暗杀+尸体流程。</summary>
         private void HandleAttack()
         {
-            if (killExecutor == null) return;
+            if (killExecutor == null)
+            {
+                Debug.LogWarning("[PlayerInteractor] F pressed but KillExecutor is null");
+                return;
+            }
 
-            // 在攻击范围内查找目标类型顾客
+            // 在攻击范围内查找顾客（不限 Layer，直接 OverlapCircleAll）
             Vector2 origin = GetDetectOrigin();
-            float range = attackRange;
-            var hits = Physics2D.OverlapCircleAll(origin, range, interactableMask);
+            var hits = Physics2D.OverlapCircleAll(origin, attackRange);
+            Debug.Log($"[PlayerInteractor] F pressed at {origin}, range={attackRange}, hits={hits.Length}");
             foreach (var hit in hits)
             {
                 var ai = hit.GetComponent<CustomerAI>();
                 if (ai == null) ai = hit.GetComponentInParent<CustomerAI>();
                 if (ai == null || ai.IsDead) continue;
 
-                // 仅击杀 Target 类型（暗杀目标），或任何可击杀的顾客
-                if (ai.Profile != null && ai.Profile.type == CustomerType.Target)
+                // 击杀任何顾客（M2 测试阶段，不限 Target）
+                KillMethodData method = meleeKillMethod;
+                if (method == null)
                 {
-                    KillMethodData method = meleeKillMethod;
-                    if (method == null)
-                    {
-                        // 从 JsonDataLoader 获取 knife 方式
-                        var methods = Core.DataLoader.JsonDataLoader.KillMethods;
-                        if (methods != null)
-                            method = methods.Find(m => m.id == "knife");
-                    }
-                    killExecutor.Execute(ai, method ?? ScriptableObject.CreateInstance<KillMethodData>());
-                    return; // 每次攻击只击杀一个目标
+                    var methods = Core.DataLoader.JsonDataLoader.KillMethods;
+                    if (methods != null)
+                        method = methods.Find(m => m.id == "knife");
                 }
+                Debug.Log($"[PlayerInteractor] Killing customer {ai.name} type={ai.Profile?.type}");
+                killExecutor.Execute(ai, method ?? ScriptableObject.CreateInstance<KillMethodData>());
+                return; // 每次攻击只击杀一个
             }
         }
 

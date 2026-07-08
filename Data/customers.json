@@ -1,11 +1,11 @@
 {
   "$schema": "CustomerData",
-  "description": "顾客类型配置。probability 为生成权重（同帧归一化）。Target 类型不付款，被暗杀后掉落目标奖励。Informant 付款固定为 paymentMin，并在离场时额外提供 1 点情报（intel，非金钱，详见 README）。preferredRecipeId 留空表示随机点餐；Target 在运行时由 TargetProfile.favRecipe 覆盖。",
+  "description": "顾客类型配置。M2 测试阶段：Target 概率调高到 0.30 方便测试暗杀流程。",
   "customers": [
     {
       "id": "normal",
       "type": "Normal",
-      "probability": 0.85,
+      "probability": 0.50,
       "patienceSec": 40,
       "paymentMin": 10,
       "paymentMax": 20,
@@ -14,7 +14,7 @@
     {
       "id": "informant",
       "type": "Informant",
-      "probability": 0.10,
+      "probability": 0.20,
       "patienceSec": 60,
       "paymentMin": 5,
       "paymentMax": 5,
@@ -23,7 +23,7 @@
     {
       "id": "target",
       "type": "Target",
-      "probability": 0.05,
+      "probability": 0.30,
       "patienceSec": 120,
       "paymentMin": 0,
       "paymentMax": 0,
