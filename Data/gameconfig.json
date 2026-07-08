@@ -1,0 +1,13 @@
+{
+  "$schema": "GameConfig",
+  "description": "全局配置。dayDurationSec 为单关卡（一个白天）总时长。cover 为伪装度，超过 0 即开始抵消通缉度增长，自然恢复 coverRegenPerSec/秒。wanted 为通缉度，达到 wantedThreshold 即触发警力集结/任务失败。alert 为瞬时警报值，按 alertDecayPerSec 衰减。policeVision* 为警察视野锥参数（格数 / 度）。inspectorIntervalSec 为卫生检查员每次造访的最短间隔。",
+  "dayDurationSec": 480,
+  "startMoney": 100,
+  "coverMax": 100,
+  "coverRegenPerSec": 0.5,
+  "wantedThreshold": 100,
+  "alertDecayPerSec": 2,
+  "policeVisionRange": 5,
+  "policeVisionAngle": 60,
+  "inspectorIntervalSec": 120
+}

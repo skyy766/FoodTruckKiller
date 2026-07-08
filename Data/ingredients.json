@@ -1,0 +1,36 @@
+{
+  "$schema": "IngredientData",
+  "description": "食材列表。isIllegal=true 的食材一旦被卫生检查员或警察发现将直接大幅提升通缉度。人肉由绞肉机处理尸体获得，毒药/特殊香料需从黑市或帮派据点补给。",
+  "ingredients": [
+    {
+      "id": "bread",
+      "name": "面包",
+      "isIllegal": false
+    },
+    {
+      "id": "patty",
+      "name": "肉饼",
+      "isIllegal": false
+    },
+    {
+      "id": "lettuce",
+      "name": "生菜",
+      "isIllegal": false
+    },
+    {
+      "id": "human_meat",
+      "name": "人肉",
+      "isIllegal": true
+    },
+    {
+      "id": "poison",
+      "name": "毒药",
+      "isIllegal": true
+    },
+    {
+      "id": "special_spice",
+      "name": "特殊香料",
+      "isIllegal": false
+    }
+  ]
+}

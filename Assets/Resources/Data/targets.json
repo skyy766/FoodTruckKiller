@@ -1,0 +1,22 @@
+{
+  "$schema": "TargetData",
+  "description": "暗杀目标。favFood 为目标偏好的正常食谱 id，目标点餐后会前往对应击杀点（由关卡布点决定）。baitRecipe 为诱饵食谱 id，使用诱饵餐可大幅提高目标出现概率并引导其走向玩家预设的击杀点。reward 为暗杀成功后的金钱奖励。",
+  "targets": [
+    {
+      "id": "t_tony",
+      "name": "Tony \"The Tooth\" Marzano",
+      "favFood": "burger",
+      "weakpoint": "左侧假牙松动，被诱至暗巷后用近战厨刀可一击毙命；但暗巷紧邻主干道，噪声半径 2 仍可能引来巡警，建议在巡警走远时动手。",
+      "reward": 200,
+      "baitRecipe": "bait_meal"
+    },
+    {
+      "id": "t_lena",
+      "name": "Lena \"The Slicer\" Voss",
+      "favFood": "hotdog",
+      "weakpoint": "习惯在侧巷广告牌下抽烟，可提前松动广告牌螺栓，待其就位后触发掉落伪装成意外；需确认侧巷无目击者，否则改用煤气罐。",
+      "reward": 250,
+      "baitRecipe": "bait_meal"
+    }
+  ]
+}

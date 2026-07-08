@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>餐车杀手 — 经营 Demo</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0d0d1a; display:flex; justify-content:center; align-items:center; min-height:100vh; font-family:'Courier New',monospace; }
+  #wrap { position:relative; }
+  canvas { display:block; image-rendering:pixelated; image-rendering:crisp-edges; border:2px solid #333; border-radius:4px; cursor:pointer; }
+  #hint { position:absolute; bottom:-28px; left:0; right:0; text-align:center; color:#666; font-size:13px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game" width="960" height="640"></canvas>
+  <div id="hint">点击食材组装 → 点击「出餐」交付排队最前顾客 | 3分钟赚够150元获胜</div>
+</div>
+<script>
+const cv = document.getElementById('game');
+const ctx = cv.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+const W = 960, H = 640;
+
+// ============ 音效 (Web Audio) ============
+let actx = null;
+function initAudio(){ if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)(); }
+function beep(freq, dur, type='sine', vol=0.08){
+  if(!actx) return;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol, actx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
+  o.connect(g).connect(actx.destination);
+  o.start(); o.stop(actx.currentTime + dur);
+}
+function sfxChop(){ beep(2200,0.08,'square',0.05); }
+function sfxServe(){ beep(880,0.12,'sine',0.1); setTimeout(()=>beep(1320,0.1,'sine',0.08),80); }
+function sfxCash(){ beep(660,0.08,'sine',0.1); setTimeout(()=>beep(990,0.12,'sine',0.1),70); }
+function sfxError(){ beep(200,0.15,'sawtooth',0.08); }
+function sfxOrderIn(){ beep(523,0.06,'triangle',0.06); setTimeout(()=>beep(659,0.08,'triangle',0.06),60); }
+
+// ============ 游戏数据 ============
+const INGREDIENTS = [
+  { id:'bread',  name:'面包', color:'#d4a055', dark:'#a07835' },
+  { id:'patty',  name:'肉饼', color:'#8b4513', dark:'#5d2e0c' },
+  { id:'lettuce',name:'生菜', color:'#5cb85c', dark:'#3a7a3a' },
+];
+const ING_MAP = {}; INGREDIENTS.forEach(i=>ING_MAP[i.id]=i);
+
+const RECIPES = [
+  { name:'汉堡', seq:['bread','patty','lettuce','bread'], price:15 },
+  { name:'热狗', seq:['bread','patty'], price:10 },
+  { name:'生菜卷', seq:['lettuce','patty','lettuce'], price:12 },
+];
+
+// ============ 状态 ============
+let gameState = 'menu'; // menu / playing / victory / gameover
+let money, goal, timeLeft, dayDur;
+let customers, assembling, spawnTimer, particles, feedbackTimer, feedbackText, feedbackColor;
+let mouse = { x:0, y:0, clicked:false };
+
+function resetGame(){
+  money = 100; goal = 150; dayDur = 180; timeLeft = dayDur;
+  customers = []; assembling = []; spawnTimer = 1; particles = [];
+  feedbackTimer = 0; feedbackText = ''; feedbackColor = '#fff';
+}
+
+// ============ 顾客 ============
+class Customer {
+  constructor(){
+    this.slotIdx = customers.filter(c=>c.state!=='leaving'&&c.state!=='served').length;
+    this.targetX = 180 + this.slotIdx * 70;
+    this.x = -60; this.y = 330;
+    this.vx = 0; this.state = 'walking';
+    this.recipe = RECIPES[Math.floor(Math.random()*RECIPES.length)];
+    this.patience = 30 + Math.random()*12;
+    this.maxPatience = this.patience;
+    const cols = ['#4a90d9','#5cb85c','#f0ad4e','#9b59b6','#e74c3c'];
+    this.color = cols[Math.floor(Math.random()*cols.length)];
+    this.bob = 0; this.served = false; this.leaveTimer = 0;
+    this.angry = false;
+  }
+  update(dt){
+    this.bob += dt * 6;
+    if(this.state === 'walking'){
+      if(this.x < this.targetX){ this.x += 55*dt; if(this.x >= this.targetX){ this.x = this.targetX; this.state='waiting'; sfxOrderIn(); } }
+    } else if(this.state === 'waiting'){
+      this.patience -= dt;
+      if(this.patience <= 0){ this.state='leaving'; this.angry=true; this.vx=-80; if(!this.served) feedback('顾客等不及走了!', '#e74c3c'); }
+    } else if(this.state === 'served'){
+      this.leaveTimer += dt;
+      this.x += 70*dt;
+      if(this.leaveTimer > 1.5) this.state='gone';
+    } else if(this.state === 'leaving'){
+      this.x += this.vx*dt;
+      if(this.x < -80) this.state='gone';
+    }
+    // 重新计算排队位置
+    if(this.state==='waiting'){
+      const idx = customers.filter(c=>c!==this && c.state!=='leaving'&&c.state!=='served'&&c.state!=='gone' && c.x < this.x).length;
+      this.targetX = 180 + idx * 70;
+      if(Math.abs(this.x - this.targetX) > 2) this.x += (this.targetX - this.x) * 3 * dt;
+    }
+  }
+  draw(ctx){
+    if(this.state==='gone') return;
+    const yOff = this.state==='walking' ? Math.sin(this.bob)*2 : 0;
+    const cx = Math.round(this.x), cy = Math.round(this.y + yOff);
+    // 影子
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath(); ctx.ellipse(cx, cy+28, 16, 5, 0, 0, Math.PI*2); ctx.fill();
+    // 身体 (32x32 像素风)
+    ctx.fillStyle = this.color;
+    ctx.fillRect(cx-12, cy-10, 24, 24);
+    // 头
+    ctx.fillStyle = '#f4c2a1';
+    ctx.fillRect(cx-8, cy-22, 16, 14);
+    // 头发
+    ctx.fillStyle = '#3a3a3a';
+    ctx.fillRect(cx-8, cy-24, 16, 6);
+    // 眼睛
+    ctx.fillStyle = '#222';
+    ctx.fillRect(cx-5, cy-16, 3, 3);
+    ctx.fillRect(cx+2, cy-16, 3, 3);
+    // 嘴 (生气时倒置)
+    ctx.fillStyle = '#222';
+    if(this.angry){ ctx.fillRect(cx-4, cy-10, 8, 2); } else { ctx.fillRect(cx-3, cy-11, 6, 2); }
+    // 脚
+    ctx.fillStyle = '#222';
+    ctx.fillRect(cx-10, cy+14, 8, 4);
+    ctx.fillRect(cx+2, cy+14, 8, 4);
+
+    // 订单气泡 (仅 waiting 状态)
+    if(this.state === 'waiting'){
+      this.drawOrderBubble(ctx, cx, cy);
+      // 耐心条
+      const pct = Math.max(0, this.patience / this.maxPatience);
+      const barW = 36, barX = cx - barW/2, barY = cy - 52;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(barX-1, barY-1, barW+2, 6);
+      ctx.fillStyle = pct > 0.5 ? '#5cb85c' : pct > 0.25 ? '#f0ad4e' : '#e74c3c';
+      ctx.fillRect(barX, barY, barW * pct, 4);
+    }
+
+    // 满意/生气表情
+    if(this.state === 'served'){
+      ctx.fillStyle = '#ffd700';
+      ctx.font = 'bold 20px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('♥', cx+18, cy-15);
+    }
+  }
+  drawOrderBubble(ctx, cx, cy){
+    const items = this.recipe.seq;
+    const iconSize = 14, gap = 3;
+    const bw = items.length * (iconSize+gap) + 10;
+    const bh = 24;
+    const bx = cx - bw/2, by = cy - 78;
+    // 气泡背景
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 2;
+    roundRect(ctx, bx, by, bw, bh, 5); ctx.fill(); ctx.stroke();
+    // 尾巴
+    ctx.beginPath();
+    ctx.moveTo(cx-4, by+bh); ctx.lineTo(cx+4, by+bh); ctx.lineTo(cx, by+bh+6);
+    ctx.closePath(); ctx.fillStyle='rgba(255,255,255,0.92)'; ctx.fill();
+    // 食材图标
+    items.forEach((id, i) => {
+      const ix = bx + 5 + i*(iconSize+gap);
+      const iy = by + 5;
+      const ing = ING_MAP[id];
+      ctx.fillStyle = ing.color;
+      ctx.fillRect(ix, iy, iconSize, iconSize);
+      ctx.fillStyle = ing.dark;
+      ctx.fillRect(ix, iy+iconSize-3, iconSize, 3);
+    });
+  }
+}
+
+// ============ 粒子 ============
+class Particle {
+  constructor(x, y, type){
+    this.x=x; this.y=y; this.type=type; this.life=1; this.vy=-60;
+    this.vx = (Math.random()-0.5)*40;
+    if(type==='coin'){ this.vy=-100; this.vx=(Math.random()-0.5)*60; }
+    if(type==='x'){ this.vy=-30; this.vx=0; }
+  }
+  update(dt){
+    this.x += this.vx*dt; this.y += this.vy*dt; this.vy += 80*dt;
+    this.life -= dt * 1.5;
+  }
+  draw(ctx){
+    if(this.life <= 0) return;
+    ctx.globalAlpha = Math.max(0, this.life);
+    if(this.type==='coin'){
+      ctx.fillStyle = '#ffd700';
+      ctx.font = 'bold 18px monospace'; ctx.textAlign='center';
+      ctx.fillText('$', this.x, this.y);
+    } else if(this.type==='x'){
+      ctx.fillStyle = '#e74c3c';
+      ctx.font = 'bold 24px monospace'; ctx.textAlign='center';
+      ctx.fillText('✗', this.x, this.y);
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ============ 工具 ============
+function roundRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+function feedback(text, color){
+  feedbackText = text; feedbackColor = color; feedbackTimer = 2;
+}
+
+// 按钮区域定义
+const BTN_Y = 560, BTN_H = 64;
+const ING_BTNS = INGREDIENTS.map((ing, i) => ({
+  x: 20 + i * 130, y: BTN_Y, w: 120, h: BTN_H, ing: ing, label: ing.name
+}));
+const SERVE_BTN = { x: 420, y: BTN_Y, w: 140, h: BTN_H, label: '出餐' };
+const CLEAR_BTN = { x: 580, y: BTN_Y, w: 100, h: BTN_H, label: '丢弃' };
+const START_BTN = { x: W/2-100, y: 380, w: 200, h: 60, label: '点击开始' };
+const RESTART_BTN = { x: W/2-100, y: 420, w: 200, h: 56, label: '重新开始' };
+
+function inBtn(btn, mx, my){
+  return mx >= btn.x && mx <= btn.x+btn.w && my >= btn.y && my <= btn.y+btn.h;
+}
+
+// ============ 游戏逻辑 ============
+function tryServe(){
+  if(assembling.length === 0){ feedback('没有食材可出餐!', '#f0ad4e'); return; }
+  // 找最前面的 waiting 顾客
+  const target = customers.filter(c=>c.state==='waiting').sort((a,b)=>a.x-b.x)[0];
+  if(!target){ feedback('没有顾客在等!', '#f0ad4e'); return; }
+  // 校验
+  const seq = assembling.map(a=>a.id);
+  const match = seq.length === target.recipe.seq.length &&
+    seq.every((v,i)=>v===target.recipe.seq[i]);
+  if(match){
+    money += target.recipe.price;
+    target.state = 'served'; target.served = true;
+    sfxServe(); setTimeout(sfxCash, 150);
+    // 金币粒子
+    for(let i=0;i<6;i++) particles.push(new Particle(target.x, target.y-10, 'coin'));
+    feedback(`+${target.recipe.price}元 ${target.recipe.name}!`, '#5cb85c');
+    if(money >= goal){ gameState = 'victory'; }
+  } else {
+    target.state = 'leaving'; target.angry = true; target.vx = -80;
+    sfxError();
+    particles.push(new Particle(target.x, target.y-20, 'x'));
+    feedback('订单错误!', '#e74c3c');
+  }
+  assembling = [];
+}
+
+function update(dt){
+  if(gameState !== 'playing') return;
+  // 时间
+  timeLeft -= dt;
+  if(timeLeft <= 0){
+    timeLeft = 0;
+    gameState = money >= goal ? 'victory' : 'gameover';
+    return;
+  }
+  // 生成顾客
+  spawnTimer -= dt;
+  const activeCount = customers.filter(c=>c.state!=='gone'&&c.state!=='served'&&c.state!=='leaving').length;
+  if(spawnTimer <= 0 && activeCount < 4){
+    spawnTimer = 5 + Math.random()*4;
+    customers.push(new Customer());
+  }
+  // 更新顾客
+  customers.forEach(c => c.update(dt));
+  customers = customers.filter(c => c.state !== 'gone');
+  // 粒子
+  particles.forEach(p => p.update(dt));
+  particles = particles.filter(p => p.life > 0);
+  // 反馈
+  if(feedbackTimer > 0) feedbackTimer -= dt;
+}
+
+// ============ 绘制 ============
+function drawBg(){
+  // 天空渐变
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#2a1a3a'); g.addColorStop(0.4,'#3a2a5a'); g.addColorStop(1,'#1a1a2e');
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  // 远景建筑
+  ctx.fillStyle = '#1a1a2e';
+  for(let i=0;i<8;i++){
+    const bx = i*130, bw=100, bh=80+Math.sin(i*2)*30;
+    ctx.fillRect(bx, 120-bh, bw, bh);
+  }
+  // 建筑窗户
+  ctx.fillStyle = '#ffd700';
+  for(let i=0;i<8;i++){
+    const bx = i*130;
+    for(let j=0;j<3;j++) for(let k=0;k<2;k++){
+      if((i+j+k)%3===0) ctx.fillRect(bx+15+k*35, 120-60+j*20, 8, 8);
+    }
+  }
+  // 街道
+  ctx.fillStyle = '#2a2a3a';
+  ctx.fillRect(0, 300, W, 200);
+  // 路面线
+  ctx.strokeStyle = '#555'; ctx.lineWidth = 2; ctx.setLineDash([20,15]);
+  ctx.beginPath(); ctx.moveTo(0, 400); ctx.lineTo(W, 400); ctx.stroke(); ctx.setLineDash([]);
+  // 人行道
+  ctx.fillStyle = '#3a3a4a';
+  ctx.fillRect(0, 290, W, 14);
+}
+
+function drawTruck(){
+  // 餐车 (右侧)
+  const tx = 680, ty = 280;
+  // 车身阴影
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.beginPath(); ctx.ellipse(tx+100, ty+120, 110, 8, 0, 0, Math.PI*2); ctx.fill();
+  // 车身
+  ctx.fillStyle = '#c0392b'; ctx.fillRect(tx, ty, 200, 110);
+  ctx.fillStyle = '#e74c3c'; ctx.fillRect(tx+4, ty+4, 192, 102);
+  // 车顶
+  ctx.fillStyle = '#333'; ctx.fillRect(tx-5, ty-8, 210, 12);
+  // 出餐窗口
+  ctx.fillStyle = '#1a1a1a'; ctx.fillRect(tx+20, ty+30, 70, 50);
+  ctx.fillStyle = '#f4c2a1'; ctx.fillRect(tx+24, ty+34, 62, 42);
+  // 窗口帘
+  ctx.fillStyle = '#c0392b';
+  for(let i=0;i<5;i++) ctx.fillRect(tx+24+i*12, ty+34, 6, 42);
+  // 招牌
+  ctx.fillStyle = '#f39c12'; ctx.fillRect(tx+30, ty-30, 140, 24);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 14px monospace'; ctx.textAlign='center';
+  ctx.fillText('餐车杀手', tx+100, ty-13);
+  // 轮子
+  ctx.fillStyle = '#1a1a1a';
+  ctx.beginPath(); ctx.arc(tx+40, ty+115, 16, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(tx+160, ty+115, 16, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#555';
+  ctx.beginPath(); ctx.arc(tx+40, ty+115, 6, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(tx+160, ty+115, 6, 0, Math.PI*2); ctx.fill();
+  // 烹饪台细节 (左侧车身)
+  ctx.fillStyle = '#7f8c8d'; ctx.fillRect(tx+100, ty+30, 80, 50);
+  ctx.fillStyle = '#e67e22'; ctx.fillRect(tx+108, ty+38, 16, 16); // 火焰
+  ctx.fillStyle = '#f1c40f'; ctx.fillRect(tx+110, ty+40, 12, 12);
+  ctx.fillStyle = '#95a5a6'; ctx.fillRect(tx+135, ty+38, 35, 20); // 切菜板
+}
+
+function drawHUD(){
+  // 背景条
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(0, 0, W, 60);
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0,60); ctx.lineTo(W,60); ctx.stroke();
+  // 金钱
+  ctx.fillStyle = '#ffd700'; ctx.font = 'bold 24px monospace'; ctx.textAlign='left';
+  ctx.fillText('$ ' + money, 20, 38);
+  // 目标
+  ctx.fillStyle = '#5cb85c';
+  ctx.fillText(`目标: ${goal}`, 200, 38);
+  // 进度条
+  ctx.fillStyle = '#333'; ctx.fillRect(310, 22, 200, 16);
+  ctx.fillStyle = '#5cb85c'; ctx.fillRect(310, 22, Math.min(200, 200*money/goal), 16);
+  ctx.strokeStyle='#666'; ctx.lineWidth=1; ctx.strokeRect(310,22,200,16);
+  // 时间
+  const m = Math.floor(timeLeft/60), s = Math.floor(timeLeft%60);
+  ctx.fillStyle = timeLeft < 30 ? '#e74c3c' : '#fff';
+  ctx.font = 'bold 28px monospace'; ctx.textAlign='right';
+  ctx.fillText(`${m}:${s.toString().padStart(2,'0')}`, W-20, 40);
+  // 顾客计数
+  ctx.fillStyle = '#aaa'; ctx.font = '14px monospace'; ctx.textAlign='center';
+  ctx.fillText(`顾客: ${customers.filter(c=>c.state==='waiting').length} 在等`, W/2, 38);
+}
+
+function drawAssembly(){
+  // 组装区背景
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(0, 490, W, 60);
+  ctx.strokeStyle = '#555'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(0,490); ctx.lineTo(W,490); ctx.stroke();
+  // 标签
+  ctx.fillStyle = '#888'; ctx.font = '13px monospace'; ctx.textAlign='left';
+  ctx.fillText('当前组装:', 15, 515);
+  // 组装序列
+  assembling.forEach((ing, i) => {
+    const ax = 110 + i * 36, ay = 500;
+    ctx.fillStyle = ing.color; ctx.fillRect(ax, ay, 28, 28);
+    ctx.fillStyle = ing.dark; ctx.fillRect(ax, ay+22, 28, 6);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.strokeRect(ax, ay, 28, 28);
+  });
+  // 箭头提示
+  if(assembling.length > 0){
+    ctx.fillStyle = '#666'; ctx.font = '12px monospace';
+    ctx.fillText('→ 点击「出餐」交付', 110 + assembling.length*36 + 10, 518);
+  }
+}
+
+function drawButtons(){
+  // 食材按钮
+  ING_BTNS.forEach(btn => {
+    const hover = inBtn(btn, mouse.x, mouse.y);
+    ctx.fillStyle = hover ? '#3a3a4a' : '#2a2a3a';
+    ctx.fillRect(btn.x, btn.y, btn.w, btn.h);
+    ctx.strokeStyle = btn.ing.color; ctx.lineWidth = 2;
+    ctx.strokeRect(btn.x, btn.y, btn.w, btn.h);
+    // 食材图标
+    ctx.fillStyle = btn.ing.color;
+    ctx.fillRect(btn.x + btn.w/2 - 16, btn.y + 8, 32, 32);
+    ctx.fillStyle = btn.ing.dark;
+    ctx.fillRect(btn.x + btn.w/2 - 16, btn.y + 32, 32, 8);
+    // 标签
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 13px monospace'; ctx.textAlign='center';
+    ctx.fillText(btn.label, btn.x + btn.w/2, btn.y + 56);
+  });
+  // 出餐按钮
+  drawBtn(SERVE_BTN, '#27ae60', '#2ecc71');
+  // 丢弃按钮
+  drawBtn(CLEAR_BTN, '#e67e22', '#f39c12');
+}
+
+function drawBtn(btn, c1, c2){
+  const hover = inBtn(btn, mouse.x, mouse.y);
+  ctx.fillStyle = hover ? c2 : c1;
+  ctx.fillRect(btn.x, btn.y, btn.w, btn.h);
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.strokeRect(btn.x, btn.y, btn.w, btn.h);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 18px monospace'; ctx.textAlign='center';
+  ctx.fillText(btn.label, btn.x + btn.w/2, btn.y + btn.h/2 + 6);
+}
+
+function drawFeedback(){
+  if(feedbackTimer > 0){
+    ctx.globalAlpha = Math.min(1, feedbackTimer);
+    ctx.fillStyle = feedbackColor;
+    ctx.font = 'bold 22px monospace'; ctx.textAlign = 'center';
+    ctx.fillText(feedbackText, W/2, 470);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawMenu(){
+  ctx.fillStyle = 'rgba(0,0,0,0.8)';
+  ctx.fillRect(0, 0, W, H);
+  // 标题
+  ctx.fillStyle = '#e74c3c'; ctx.font = 'bold 56px monospace'; ctx.textAlign = 'center';
+  ctx.fillText('餐车杀手', W/2, 180);
+  ctx.fillStyle = '#f39c12'; ctx.font = '20px monospace';
+  ctx.fillText('Food Truck Killer — 经营 Demo', W/2, 220);
+  // 说明
+  ctx.fillStyle = '#ccc'; ctx.font = '15px monospace';
+  ctx.fillText('顾客会从左侧走来排队，头顶显示订单', W/2, 270);
+  ctx.fillText('点击底部食材按钮按顺序组装，再点「出餐」交付', W/2, 295);
+  ctx.fillText('订单正确 = 加钱，错误 = 顾客生气离开', W/2, 320);
+  ctx.fillStyle = '#5cb85c';
+  ctx.fillText(`3 分钟内赚够 ${goal} 元即获胜（起始 ${100} 元）`, W/2, 350);
+  // 开始按钮
+  drawBtn(START_BTN, '#c0392b', '#e74c3c');
+}
+
+function drawEndScreen(){
+  ctx.fillStyle = 'rgba(0,0,0,0.85)';
+  ctx.fillRect(0, 0, W, H);
+  const win = gameState === 'victory';
+  ctx.fillStyle = win ? '#5cb85c' : '#e74c3c';
+  ctx.font = 'bold 52px monospace'; ctx.textAlign = 'center';
+  ctx.fillText(win ? '经营成功！' : '经营失败', W/2, 220);
+  ctx.fillStyle = '#ffd700'; ctx.font = '28px monospace';
+  ctx.fillText(`最终收入: ${money} 元`, W/2, 280);
+  ctx.fillStyle = '#ccc'; ctx.font = '16px monospace';
+  const remaining = Math.floor(timeLeft);
+  ctx.fillText(win ? `剩余时间 ${Math.floor(remaining/60)}:${(remaining%60).toString().padStart(2,'0')}` : '时间到了，没赚够钱', W/2, 320);
+  drawBtn(RESTART_BTN, '#c0392b', '#e74c3c');
+}
+
+// ============ 主循环 ============
+function draw(){
+  drawBg();
+  if(gameState === 'menu'){
+    drawTruck();
+    drawMenu();
+    return;
+  }
+  drawTruck();
+  // 顾客 (按 y 排序保证遮挡)
+  customers.sort((a,b)=>a.y-b.y).forEach(c => c.draw(ctx));
+  // 粒子
+  particles.forEach(p => p.draw(ctx));
+  drawHUD();
+  drawAssembly();
+  drawButtons();
+  drawFeedback();
+  if(gameState === 'victory' || gameState === 'gameover'){
+    drawEndScreen();
+  }
+}
+
+let lastT = 0;
+function loop(t){
+  const dt = Math.min(0.05, (t - lastT) / 1000);
+  lastT = t;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ============ 输入 ============
+cv.addEventListener('mousemove', e => {
+  const r = cv.getBoundingClientRect();
+  mouse.x = (e.clientX - r.left) * (W / r.width);
+  mouse.y = (e.clientY - r.top) * (H / r.height);
+});
+
+cv.addEventListener('click', e => {
+  initAudio();
+  const r = cv.getBoundingClientRect();
+  const mx = (e.clientX - r.left) * (W / r.width);
+  const my = (e.clientY - r.top) * (H / r.height);
+
+  if(gameState === 'menu'){
+    if(inBtn(START_BTN, mx, my)){ resetGame(); gameState = 'playing'; }
+    return;
+  }
+  if(gameState === 'victory' || gameState === 'gameover'){
+    if(inBtn(RESTART_BTN, mx, my)){ resetGame(); gameState = 'playing'; }
+    return;
+  }
+  if(gameState !== 'playing') return;
+
+  // 食材按钮
+  for(const btn of ING_BTNS){
+    if(inBtn(btn, mx, my)){
+      if(assembling.length < 6){
+        assembling.push(btn.ing);
+        sfxChop();
+      }
+      return;
+    }
+  }
+  // 出餐
+  if(inBtn(SERVE_BTN, mx, my)){ tryServe(); return; }
+  // 丢弃
+  if(inBtn(CLEAR_BTN, mx, my)){ assembling = []; feedback('已清空', '#888'); return; }
+});
+
+// 启动
+resetGame();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

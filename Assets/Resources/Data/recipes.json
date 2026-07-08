@@ -1,0 +1,38 @@
+{
+  "$schema": "RecipeData",
+  "description": "食谱列表。ingredients 为按制作顺序排列的食材 id 数组；type 取值 Normal/Bait/HumanMeat。Bait 与 HumanMeat 不直接售卖，price=0。cookDuration 为烹饪台出餐总时长（秒），未填默认 5s。",
+  "recipes": [
+    {
+      "id": "burger",
+      "name": "汉堡",
+      "ingredients": ["bread", "patty", "lettuce", "bread"],
+      "price": 15,
+      "type": "Normal",
+      "cookDuration": 5
+    },
+    {
+      "id": "hotdog",
+      "name": "热狗",
+      "ingredients": ["bread", "patty"],
+      "price": 10,
+      "type": "Normal",
+      "cookDuration": 4
+    },
+    {
+      "id": "bait_meal",
+      "name": "诱饵餐",
+      "ingredients": ["special_spice", "patty", "bread"],
+      "price": 0,
+      "type": "Bait",
+      "cookDuration": 6
+    },
+    {
+      "id": "human_meal",
+      "name": "人肉餐",
+      "ingredients": ["human_meat", "bread"],
+      "price": 0,
+      "type": "HumanMeat",
+      "cookDuration": 5
+    }
+  ]
+}

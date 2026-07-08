@@ -1,0 +1,34 @@
+{
+  "$schema": "KillMethodData",
+  "description": "击杀方式。damage=100 表示对目标一击必杀（MVP 阶段目标均为满血 100）。noiseRadius 为引起 AI 注意的格数半径，0 表示无声。evidenceType 取值 Bloodstain/ExplosionTrace/None，决定现场遗留证据类型，影响卫生检查员与警察的判定。",
+  "killmethods": [
+    {
+      "id": "knife",
+      "name": "近战厨刀",
+      "damage": 100,
+      "noiseRadius": 2,
+      "evidenceType": "Bloodstain"
+    },
+    {
+      "id": "gas_tank",
+      "name": "煤气罐爆炸",
+      "damage": 100,
+      "noiseRadius": 8,
+      "evidenceType": "ExplosionTrace"
+    },
+    {
+      "id": "billboard",
+      "name": "广告牌掉落",
+      "damage": 100,
+      "noiseRadius": 3,
+      "evidenceType": "Bloodstain"
+    },
+    {
+      "id": "poison",
+      "name": "投毒",
+      "damage": 100,
+      "noiseRadius": 0,
+      "evidenceType": "None"
+    }
+  ]
+}
