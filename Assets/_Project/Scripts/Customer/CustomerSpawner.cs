@@ -117,6 +117,10 @@ namespace FoodTruckKiller.Customer
             go.transform.position = pos;
             var rb = go.AddComponent<Rigidbody2D>();
             rb.gravityScale = 0f;
+            // M2.5 修复: 必须有 Collider2D 才能被 Physics2D.OverlapCircle 检测到
+            var col = go.AddComponent<CircleCollider2D>();
+            col.radius = 0.4f;
+            col.isTrigger = true;
             int variant = (SpawnedCount % 3) + 1;
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sortingOrder = 10;
