@@ -41,6 +41,10 @@ namespace FoodTruckKiller.Player
         private InputAction interactAction;
         private IInteractable currentTarget;
 
+        /// <summary>近战攻击冷却（秒），防止一帧内连按 F 造成"误杀多个"。</summary>
+        [SerializeField] private float attackCooldown = 0.4f;
+        private float _lastAttackTime = -999f;
+
         /// <summary>当前检测到的可交互物（可空）。</summary>
         public IInteractable CurrentTarget => currentTarget;
 
@@ -138,7 +142,7 @@ namespace FoodTruckKiller.Player
             }
         }
 
-        /// <summary>处理攻击（F 键）：在朝向前方检测顾客并执行近战击杀。
+        /// <summary>处理攻击（F 键）：在朝向前方锥形区域检测顾客并执行近战击杀。
         /// M2 测试阶段：允许击杀任何顾客（不限 Target 类型），方便测试暗杀+尸体流程。</summary>
         private void HandleAttack()
         {
@@ -148,28 +152,54 @@ namespace FoodTruckKiller.Player
                 return;
             }
 
+            // 攻击冷却：防止连按 F 误杀多个目标
+            float now = Time.time;
+            if (now - _lastAttackTime < attackCooldown)
+            {
+                return;
+            }
+
             // 在攻击范围内查找顾客（不限 Layer，直接 OverlapCircleAll）
             Vector2 origin = GetDetectOrigin();
+            Vector2 facing = controller != null ? controller.Facing : Vector2.down;
             var hits = Physics2D.OverlapCircleAll(origin, attackRange);
             Debug.Log($"[PlayerInteractor] F pressed at {origin}, range={attackRange}, hits={hits.Length}");
+
+            // 按距离玩家最近 + 扇形方向过滤（只杀朝向前方 ~60° 锥形内的）
+            CustomerAI bestTarget = null;
+            float bestDist = float.MaxValue;
             foreach (var hit in hits)
             {
                 var ai = hit.GetComponent<CustomerAI>();
                 if (ai == null) ai = hit.GetComponentInParent<CustomerAI>();
                 if (ai == null || ai.IsDead) continue;
 
-                // 击杀任何顾客（M2 测试阶段，不限 Target）
-                KillMethodData method = meleeKillMethod;
-                if (method == null)
+                // 方向过滤：目标必须大致在玩家朝向方向（点积 > 0.3 即 ~72° 锥形）
+                Vector2 dirToTarget = (ai.transform.position - (Vector3)origin).normalized;
+                float dot = Vector2.Dot(facing, dirToTarget);
+                if (dot < 0.3f) continue;
+
+                float dist = Vector2.Distance(origin, ai.transform.position);
+                if (dist < bestDist)
                 {
-                    var methods = Core.DataLoader.JsonDataLoader.KillMethods;
-                    if (methods != null)
-                        method = methods.Find(m => m.id == "knife");
+                    bestDist = dist;
+                    bestTarget = ai;
                 }
-                Debug.Log($"[PlayerInteractor] Killing customer {ai.name} type={ai.Profile?.type}");
-                killExecutor.Execute(ai, method ?? ScriptableObject.CreateInstance<KillMethodData>());
-                return; // 每次攻击只击杀一个
             }
+
+            if (bestTarget == null) return;
+
+            _lastAttackTime = now;
+
+            KillMethodData method = meleeKillMethod;
+            if (method == null)
+            {
+                var methods = Core.DataLoader.JsonDataLoader.KillMethods;
+                if (methods != null)
+                    method = methods.Find(m => m.id == "knife");
+            }
+            Debug.Log($"[PlayerInteractor] Killing customer {bestTarget.name} at {bestTarget.transform.position} (facing={facing})");
+            killExecutor.Execute(bestTarget, method ?? ScriptableObject.CreateInstance<KillMethodData>());
         }
 
         /// <summary>在朝向前方进行 OverlapCircle 检测。</summary>
