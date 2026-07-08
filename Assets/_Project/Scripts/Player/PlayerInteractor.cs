@@ -120,6 +120,16 @@ namespace FoodTruckKiller.Player
             }
         }
 
+        private void LateUpdate()
+        {
+            // M2.5 修复: 防御 currentTarget 引用已销毁的 GameObject (MissingReferenceException)
+            // 如果尸体被处理掉, 把 currentTarget 清空防止下次访问崩溃
+            if (currentTarget is Object obj && obj == null)
+            {
+                currentTarget = null;
+            }
+        }
+
         /// <summary>处理交互（E 键）。</summary>
         private void HandleInteract()
         {
@@ -263,7 +273,10 @@ namespace FoodTruckKiller.Player
             if (hit != null)
             {
                 // 用非泛型重载以兼容接口类型
-                return hit.GetComponentInParent(typeof(IInteractable)) as IInteractable;
+                var target = hit.GetComponentInParent(typeof(IInteractable)) as IInteractable;
+                // 安全检查: 已被销毁的对象 (MissingReferenceException 防护)
+                if (target is Object obj && obj == null) return null;
+                return target;
             }
             return null;
         }
