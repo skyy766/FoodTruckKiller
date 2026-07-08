@@ -238,10 +238,22 @@ namespace FoodTruckKiller.Customer
 
         public void OnEnter()
         {
-            // 禁用移动等组件。
             if (_owner == null) return;
+            var go = _owner.gameObject;
+            // 禁用移动等组件。
             var rb = _owner.GetComponent<Rigidbody2D>();
             if (rb != null) rb.simulated = false;
+            // 禁用 SpriteRenderer — 不然会显示"顾客没消失但尸体在旁边"
+            var sr = _owner.GetComponent<SpriteRenderer>();
+            if (sr != null) sr.enabled = false;
+            // 禁用子物体（如 OrderBubble）
+            foreach (Transform child in go.transform)
+            {
+                child.gameObject.SetActive(false);
+            }
+            // 禁用 collider — 防止挡住玩家或被 F 键命中
+            var col = _owner.GetComponent<Collider2D>();
+            if (col != null) col.enabled = false;
         }
 
         public void OnUpdate() { }
