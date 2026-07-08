@@ -1,9 +1,11 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using FoodTruckKiller.Assassination;
-using FoodTruckKiller.Corpse;
 using FoodTruckKiller.Customer;
 using FoodTruckKiller.Interaction;
+// 注意: 不直接 using FoodTruckKiller.Corpse, 因为 namespace 和类同名
+// 使用类型时全限定 FoodTruckKiller.Corpse.Corpse
+using CorpseEntity = FoodTruckKiller.Corpse.Corpse;
 
 namespace FoodTruckKiller.Player
 {
@@ -129,7 +131,7 @@ namespace FoodTruckKiller.Player
             currentTarget.OnInteract(controller);
 
             // 如果交互结果是拾起了尸体，同步到 CarryController
-            if (currentTarget is Corpse corpse && corpse.IsCarried && carry != null && !carry.IsCarrying)
+            if (currentTarget is CorpseEntity corpse && corpse.IsCarried && carry != null && !carry.IsCarrying)
             {
                 carry.PickUp(corpse);
             }

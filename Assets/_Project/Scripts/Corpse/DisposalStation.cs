@@ -3,6 +3,7 @@ using FoodTruckKiller.Interaction;
 using FoodTruckKiller.Inventory;
 using FoodTruckKiller.Player;
 using UnityEngine;
+using CorpseEntity = FoodTruckKiller.Corpse.Corpse;
 
 namespace FoodTruckKiller.Corpse
 {
@@ -44,7 +45,7 @@ namespace FoodTruckKiller.Corpse
         public void TryDispose(CarryController carry)
         {
             if (IsProcessing || carry == null || !carry.IsCarrying) return;
-            if (carry.CurrentCarryable is Corpse corpse && !corpse.IsDisposed)
+            if (carry.CurrentCarryable is CorpseEntity corpse && !corpse.IsDisposed)
             {
                 ProcessCorpse(corpse);
             }
