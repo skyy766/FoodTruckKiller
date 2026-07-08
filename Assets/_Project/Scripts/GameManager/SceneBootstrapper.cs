@@ -347,10 +347,22 @@ namespace FoodTruckKiller.GameManager
 
         // ---- 工具 ----
 
-        /// <summary>从 Resources 加载 Sprite，失败返回 null。</summary>
+        /// <summary>从 Resources 加载 Sprite，失败时打印警告（带路径+是否走 fallback）。</summary>
         public static Sprite LoadSprite(string path)
         {
-            return Resources.Load<Sprite>(path);
+            // 先确认 Resources 系统能找到这个 asset（TextAsset 或其他类型）
+            var anyAsset = Resources.Load(path);
+            if (anyAsset == null)
+            {
+                Debug.LogError($"[SceneBootstrapper] Resources.Load(\"{path}\") 返回 null — 文件不在 Resources/ 目录或后缀不对");
+                return null;
+            }
+            var sprite = anyAsset as Sprite;
+            if (sprite == null)
+            {
+                Debug.LogError($"[SceneBootstrapper] Resources.Load(\"{path}\") 找到资源但类型是 {anyAsset.GetType().Name}，不是 Sprite — .meta 里 TextureType 不是 Sprite");
+            }
+            return sprite;
         }
 
         private static Sprite _solidSprite;
