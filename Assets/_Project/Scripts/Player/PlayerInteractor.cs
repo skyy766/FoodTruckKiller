@@ -4,8 +4,9 @@ using FoodTruckKiller.Assassination;
 using FoodTruckKiller.Customer;
 using FoodTruckKiller.Interaction;
 // 注意: 不直接 using FoodTruckKiller.Corpse, 因为 namespace 和类同名
-// 使用类型时全限定 FoodTruckKiller.Corpse.Corpse
+// 使用类型时全限定或用 alias
 using CorpseEntity = FoodTruckKiller.Corpse.Corpse;
+using DisposalStation = FoodTruckKiller.Corpse.DisposalStation;
 
 namespace FoodTruckKiller.Player
 {
