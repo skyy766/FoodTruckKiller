@@ -308,7 +308,7 @@ namespace FoodTruckKiller.GameManager
 
         private static GameObject CreatePlayer(Vector3 pos)
         {
-            var go = new GameObject("[Player]");
+            var             go = new GameObject("[Player]");
             go.transform.position = pos;
             // 顺序：Rigidbody2D → PlayerMotor → PlayerController → KillExecutor → PlayerInteractor → CarryController
             go.AddComponent<Rigidbody2D>();
@@ -316,7 +316,16 @@ namespace FoodTruckKiller.GameManager
             var controller = go.AddComponent<PlayerController>();
             var executor = go.AddComponent<KillExecutor>();
             var interactor = go.AddComponent<PlayerInteractor>();
-            go.AddComponent<CarryController>();
+            var carry = go.AddComponent<CarryController>();
+            // M2.5 修复: CarryController 需要 carryAnchor (拖挂尸体的锚点), 没有它 OnPickedUp(null) 直接 return
+            var anchorGo = new GameObject("CarryAnchor");
+            anchorGo.transform.SetParent(go.transform, false);
+            anchorGo.transform.localPosition = new Vector3(0f, -0.3f, -0.1f);
+            // 用反射设置 carryAnchor 字段 (它是 [SerializeField] private)
+            var field = typeof(CarryController).GetField("carryAnchor",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            if (field != null) field.SetValue(carry, anchorGo.transform);
+            else Debug.LogError("[SceneBootstrapper] 未找到 carryAnchor 字段");
 
             // 绑定近战击杀方式
             if (JsonDataLoader.KillMethods != null)
