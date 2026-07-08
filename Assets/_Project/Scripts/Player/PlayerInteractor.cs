@@ -184,17 +184,18 @@ namespace FoodTruckKiller.Player
             currentTarget.OnInteract(controller);
         }
 
-        /// <summary>在玩家周围 1.0 单位内搜索未被搬运的尸体（拾取容错）。</summary>
+        /// <summary>在玩家周围 1.5 单位内搜索未被搬运的尸体（拾取容错）。</summary>
         private CorpseEntity FindNearbyCorpse()
         {
-            var hits = Physics2D.OverlapCircleAll(transform.position, 1.0f);
+            var hits = Physics2D.OverlapCircleAll(transform.position, 1.5f);
             CorpseEntity nearest = null;
             float bestSqr = float.MaxValue;
             foreach (var hit in hits)
             {
                 var c = hit.GetComponent<CorpseEntity>();
                 if (c == null) c = hit.GetComponentInParent<CorpseEntity>();
-                if (c == null || c.IsCarried || c.IsDisposed) continue;
+                if (c == null || c == null) continue; // 防御 missing reference
+                if (c.IsCarried || c.IsDisposed) continue;
                 float sqr = (c.transform.position - transform.position).sqrMagnitude;
                 if (sqr < bestSqr)
                 {
@@ -223,7 +224,8 @@ namespace FoodTruckKiller.Player
             }
 
             // 在攻击范围内查找顾客（不限 Layer，直接 OverlapCircleAll）
-            Vector2 origin = GetDetectOrigin();
+            // 用玩家脚下 (transform.position) 不用 GetDetectOrigin, 避免检测点偏离到前方
+            Vector2 origin = (Vector2)transform.position;
             Vector2 facing = controller != null ? controller.Facing : Vector2.down;
             var hits = Physics2D.OverlapCircleAll(origin, attackRange);
             Debug.Log($"[PlayerInteractor] F pressed at {origin}, range={attackRange}, hits={hits.Length}");
@@ -233,9 +235,12 @@ namespace FoodTruckKiller.Player
             float bestDist = float.MaxValue;
             foreach (var hit in hits)
             {
+                // 防御: hit 可能是已销毁但未清理的物理对象
+                if (hit == null) continue;
                 var ai = hit.GetComponent<CustomerAI>();
                 if (ai == null) ai = hit.GetComponentInParent<CustomerAI>();
-                if (ai == null || ai.IsDead) continue;
+                if (ai == null || ai == null) continue;
+                if (ai.IsDead) continue;
 
                 // 方向过滤：目标必须大致在玩家朝向方向（点积 > 0.3 即 ~72° 锥形）
                 Vector2 dirToTarget = (ai.transform.position - (Vector3)origin).normalized;
@@ -265,14 +270,15 @@ namespace FoodTruckKiller.Player
             killExecutor.Execute(bestTarget, method ?? ScriptableObject.CreateInstance<KillMethodData>());
         }
 
-        /// <summary>在朝向前方进行 OverlapCircle 检测。</summary>
+        /// <summary>在玩家脚下进行 OverlapCircle 检测 (不用 facing 偏移, 避免点偏离到前方导致交互不到)。</summary>
         private IInteractable DetectInteractable()
         {
-            Vector2 origin = GetDetectOrigin();
+            Vector2 origin = (Vector2)transform.position;
             Collider2D hit = Physics2D.OverlapCircle(origin, detectRadius, interactableMask);
             if (hit != null)
             {
-                // 用非泛型重载以兼容接口类型
+                // 防御: hit 可能是已销毁但未清理的物理对象
+                if (hit == null) return null;
                 var target = hit.GetComponentInParent(typeof(IInteractable)) as IInteractable;
                 // 安全检查: 已被销毁的对象 (MissingReferenceException 防护)
                 if (target is Object obj && obj == null) return null;
