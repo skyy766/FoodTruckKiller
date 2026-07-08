@@ -72,13 +72,13 @@ namespace FoodTruckKiller.GameManager
                 "Wall"       => "Sprites/Tilesets/wall",
                 _            => "Sprites/Tilesets/sidewalk",
             };
-            return Resources.Load<Sprite>(path);
+            return SceneBootstrapper.LoadSprite(path);
         }
 
         private void BuildLayer(Transform parent, string name, string spritePath,
             float x0, float y0, float x1, float y1, int sortingOrder)
         {
-            var sprite = Resources.Load<Sprite>(spritePath);
+            var sprite = SceneBootstrapper.LoadSprite(spritePath);
             if (sprite == null) return;
             BuildLayer(parent, name, sprite, x0, y0, x1 - x0, y1 - y0, sortingOrder);
         }

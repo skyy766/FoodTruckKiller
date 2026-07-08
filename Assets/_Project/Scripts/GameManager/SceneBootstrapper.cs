@@ -347,21 +347,25 @@ namespace FoodTruckKiller.GameManager
 
         // ---- 工具 ----
 
-        /// <summary>从 Resources 加载 Sprite，失败时打印警告（带路径+是否走 fallback）。</summary>
+        /// <summary>从 Resources 加载 Sprite，自动从 Texture2D 创建（不依赖 .meta 的 TextureType 配置）。
+        /// 失败时打印详细错误日志。</summary>
         public static Sprite LoadSprite(string path)
         {
-            // 先确认 Resources 系统能找到这个 asset（TextAsset 或其他类型）
-            var anyAsset = Resources.Load(path);
-            if (anyAsset == null)
+            // 优先尝试直接加载 Sprite（如果 .meta 已配 Sprite 导入）
+            var direct = Resources.Load<Sprite>(path);
+            if (direct != null) return direct;
+
+            // 退化：加载 Texture2D 手动创建 Sprite
+            // 这样不依赖 Unity 把 PNG 识别为 sprite
+            var tex = Resources.Load<Texture2D>(path);
+            if (tex == null)
             {
-                Debug.LogError($"[SceneBootstrapper] Resources.Load(\"{path}\") 返回 null — 文件不在 Resources/ 目录或后缀不对");
+                Debug.LogError($"[SceneBootstrapper] Resources.Load(\"{path}\") 找不到资源 — 检查路径或后缀");
                 return null;
             }
-            var sprite = anyAsset as Sprite;
-            if (sprite == null)
-            {
-                Debug.LogError($"[SceneBootstrapper] Resources.Load(\"{path}\") 找到资源但类型是 {anyAsset.GetType().Name}，不是 Sprite — .meta 里 TextureType 不是 Sprite");
-            }
+            // PPU=32 与项目约定一致；如果纹理本身 32x32 像素，1 sprite = 1 世界单位
+            var sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 32f);
+            sprite.name = path;
             return sprite;
         }
 

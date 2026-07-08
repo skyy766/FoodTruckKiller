@@ -121,9 +121,9 @@ namespace FoodTruckKiller.Cooking
             _sr = GetComponent<SpriteRenderer>();
             if (_sr != null)
             {
-                _spriteIdle  = Resources.Load<Sprite>("Sprites/Props/cooking_station");
-                _spriteCook1 = Resources.Load<Sprite>("Sprites/Props/cooking_station_cooking_01");
-                _spriteCook2 = Resources.Load<Sprite>("Sprites/Props/cooking_station_cooking_02");
+                _spriteIdle  = FoodTruckKiller.GameManager.SceneBootstrapper.LoadSprite("Sprites/Props/cooking_station");
+                _spriteCook1 = FoodTruckKiller.GameManager.SceneBootstrapper.LoadSprite("Sprites/Props/cooking_station_cooking_01");
+                _spriteCook2 = FoodTruckKiller.GameManager.SceneBootstrapper.LoadSprite("Sprites/Props/cooking_station_cooking_02");
                 if (_spriteIdle != null) _sr.sprite = _spriteIdle;
             }
         }

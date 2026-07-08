@@ -97,7 +97,7 @@ namespace FoodTruckKiller.Assassination
         {
             bool isExplosion = killMethod != null && killMethod.id == "gas_tank";
             string spriteName = isExplosion ? "Sprites/FX/explosion" : "Sprites/FX/smoke";
-            var sprite = Resources.Load<Sprite>(spriteName);
+            var sprite = FoodTruckKiller.GameManager.SceneBootstrapper.LoadSprite(spriteName);
             if (sprite == null) return;
 
             var fxGo = new GameObject(isExplosion ? "FX_Explosion" : "FX_Smoke");

@@ -49,9 +49,9 @@ namespace FoodTruckKiller.Customer
         private void Reload()
         {
             string basePath = $"Sprites/Customers/customer_{variant:00}";
-            _idle = Resources.Load<Sprite>(basePath);
+            _idle = FoodTruckKiller.GameManager.SceneBootstrapper.LoadSprite(basePath);
             for (int i = 0; i < 4; i++)
-                _walkFrames[i] = Resources.Load<Sprite>($"{basePath}_walk_{i + 1:00}");
+                _walkFrames[i] = FoodTruckKiller.GameManager.SceneBootstrapper.LoadSprite($"{basePath}_walk_{i + 1:00}");
 
             if (_sr != null && _idle != null)
             {

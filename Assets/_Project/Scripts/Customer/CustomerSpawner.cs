@@ -153,7 +153,7 @@ namespace FoodTruckKiller.Customer
             bubbleGo.transform.localPosition = new Vector3(0f, 0.9f, 0f);
 
             var sr = bubbleGo.AddComponent<SpriteRenderer>();
-            sr.sprite = Resources.Load<Sprite>("Sprites/UI/order_bubble");
+            sr.sprite = FoodTruckKiller.GameManager.SceneBootstrapper.LoadSprite("Sprites/UI/order_bubble");
             sr.sortingOrder = 12;
             sr.color = Color.white;
             if (sr.sprite == null)
@@ -189,7 +189,7 @@ namespace FoodTruckKiller.Customer
         private Sprite LoadCustomerSprite(int variant)
         {
             string path = $"Sprites/Customers/customer_0{Mathf.Clamp(variant, 0, 2) + 1}";
-            return Resources.Load<Sprite>(path);
+            return FoodTruckKiller.GameManager.SceneBootstrapper.LoadSprite(path);
         }
 
         /// <summary>

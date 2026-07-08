@@ -60,7 +60,7 @@ namespace FoodTruckKiller.Player
 
         private Sprite Load(string name)
         {
-            return Resources.Load<Sprite>(basePath + name);
+            return FoodTruckKiller.GameManager.SceneBootstrapper.LoadSprite(basePath + name);
         }
 
         private void Update()

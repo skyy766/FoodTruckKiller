@@ -65,7 +65,7 @@ namespace FoodTruckKiller.Assassination
 
                 // 视觉：尝试加载 corpse.png，失败回退到暗红色块
                 var sr = go.AddComponent<SpriteRenderer>();
-                var corpseSprite = Resources.Load<Sprite>("Sprites/Corpse/corpse");
+                var corpseSprite = FoodTruckKiller.GameManager.SceneBootstrapper.LoadSprite("Sprites/Corpse/corpse");
                 if (corpseSprite != null)
                 {
                     sr.sprite = corpseSprite;
